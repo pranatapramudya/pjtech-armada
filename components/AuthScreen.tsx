@@ -140,14 +140,35 @@ export function AuthScreen({ onAuthSuccess }: AuthScreenProps) {
     setRegStep('paket')
   }
 
-  // Selesai pilih paket -> simpan akun tunggal
+  // Selesai pilih paket -> simpan akun tunggal & push ke Cloud Neon
   const handleSelectPaketAndFinish = async (paket: PaketLangganan) => {
     playSuccessSound()
     triggerHaptic(50)
+    setErrorMsg(null)
 
     try {
-      await registerTenantCloudAction({ namaJuragan, noHp, email, pin, paket })
-    } catch (e) {}
+      const res = await fetch('/api/auth', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'register',
+          namaJuragan,
+          noHp,
+          email,
+          pin,
+          paket,
+        }),
+      });
+      const data = await res.json();
+      if (!data.success && data.message && data.message.includes('sudah terdaftar')) {
+        setErrorMsg(data.message);
+        triggerHaptic(60);
+        return;
+      }
+    } catch (e) {
+      console.warn('Offline register fallback:', e);
+    }
+
     const acc = registerUser(namaJuragan, noHp, pin, paket, email)
     saveOfflineJuragan(namaJuragan, noHp)
 
@@ -181,7 +202,16 @@ export function AuthScreen({ onAuthSuccess }: AuthScreenProps) {
     triggerHaptic(30)
 
     try {
-      const cloudRes = await loginTenantCloudAction(loginPhoneInput, loginPinInput)
+      const res = await fetch('/api/auth', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'login',
+          noHp: loginPhoneInput,
+          pin: loginPinInput,
+        }),
+      });
+      const cloudRes = await res.json();
 
       if (cloudRes.success && cloudRes.user) {
         const u = cloudRes.user
