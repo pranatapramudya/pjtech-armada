@@ -19,3 +19,11 @@ body {
   color: #0f172a;
   font-family: Arial, Helvetica, sans-serif;
 }
+
+
+/* Fix Android Chrome GPU raster tearing on sticky headers */
+header, nav {
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+  transform: translate3d(0, 0, 0);
+}

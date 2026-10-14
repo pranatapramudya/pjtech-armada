@@ -350,7 +350,7 @@ export function NumpadModal({
                 className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500"
               />
               <span className="text-xs font-bold text-slate-800">
-                Ada potongan biaya operasional armada (BBM / Tol / Servis)?
+                {isBus ? "Ada potongan komisi driver / operasional (Solar, Tol, dll)?" : "Ada potongan biaya operasional armada (BBM / Tol / Servis)?"}
               </span>
             </label>
 
@@ -372,7 +372,7 @@ export function NumpadModal({
                     type="text"
                     value={keteranganPengeluaran}
                     onChange={(e) => setKeteranganPengeluaran(e.target.value)}
-                    placeholder="Contoh: Solar / Tol / Oli"
+                    placeholder={isBus ? "Contoh: Komisi driver all in / Solar" : "Contoh: Solar / Tol / Oli"}
                     className="w-full h-9 px-2 text-xs font-bold bg-white border border-slate-300 rounded-lg focus:outline-none"
                   />
                 </div>

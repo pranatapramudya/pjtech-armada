@@ -238,13 +238,24 @@ export function deleteOfflineSetoran(id: string) {
   }
 }
 
-export function updateOfflineSetoran(id: string, data: { nominal: number; catatan?: string | null; tanggal?: string }) {
+export function updateOfflineSetoran(
+  id: string,
+  data: {
+    nominal?: number;
+    pengeluaran?: number;
+    keteranganPengeluaran?: string | null;
+    catatan?: string | null;
+    tanggal?: string;
+  }
+) {
   const current = getOfflineSetoranList();
   const updated = current.map((s) => {
     if (s.id === id) {
       return {
         ...s,
-        nominal: data.nominal,
+        nominal: data.nominal !== undefined ? data.nominal : s.nominal,
+        pengeluaran: data.pengeluaran !== undefined ? data.pengeluaran : (s.pengeluaran || 0),
+        keteranganPengeluaran: data.keteranganPengeluaran !== undefined ? data.keteranganPengeluaran : s.keteranganPengeluaran,
         catatan: data.catatan !== undefined ? data.catatan : s.catatan,
         tanggal: data.tanggal ? new Date(data.tanggal).toISOString() : s.tanggal,
       };

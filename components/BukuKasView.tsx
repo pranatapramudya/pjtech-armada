@@ -16,6 +16,8 @@ import {
   Clock,
   Car,
   User,
+  Wrench,
+  ShieldCheck,
   Building2,
   ChevronLeft,
   ChevronRight,
@@ -37,6 +39,8 @@ export interface SetoranRecord {
   angkot: {
     platNomor: string
     namaSopirTetap: string | null
+    tipeKendaraan?: string
+    keteranganArmada?: string | null
   }
 }
 
@@ -79,6 +83,7 @@ export function BukuKasView({
     tipe: 'MASUK' | 'KELUAR'
     judul: string
     nominal: number
+    isDriverCommission?: boolean
   } | null>(null)
 
   const [editModalData, setEditModalData] = useState<{
@@ -87,6 +92,7 @@ export function BukuKasView({
     judul: string
     nominal: number
     keterangan: string
+    isDriverCommission?: boolean
   } | null>(null)
   const [editNominalInput, setEditNominalInput] = useState('')
   const [editKeteranganInput, setEditKeteranganInput] = useState('')
@@ -156,18 +162,30 @@ export function BukuKasView({
   const currentPengeluaran = periodeMode === 'harian' ? pengeluaranHariIni : pengeluaranBulanIni
   const currentSetoran = periodeMode === 'harian' ? setoranHariIni : setoranBulanIni
 
-  // TOTAL PENDAPATAN KOTOR
+  // 1. TOTAL PENDAPATAN KOTOR (Order / Sewa / Setoran Armada Kotor)
   const totalPendapatan = currentSetoran.reduce((acc, curr) => acc + curr.nominal, 0)
 
-  // BREAKDOWN PENGELUARAN: PER ARMADA vs UMUM
+  // 2. TOTAL KOMISI DRIVER & POTONGAN OPERASIONAL DARI SETORAN (Kas keluar riil)
+  const totalKomisiDriver = currentSetoran.reduce((acc, curr) => acc + (curr.pengeluaran || 0), 0)
+
+  // 3. SETORAN BERSIH MASUK KAS KANTOR (Setelah dipotong komisi driver)
+  const totalSetoranBersihKantor = Math.max(0, totalPendapatan - totalKomisiDriver)
+
+  // 4. BREAKDOWN PENGELUARAN: KHUSUS ARMADA (Servis/bengkel catatan pengeluaran) vs UMUM
   const pengeluaranArmadaList = currentPengeluaran.filter((p) => !!p.angkotId)
   const pengeluaranUmumList = currentPengeluaran.filter((p) => !p.angkotId)
 
-  const totalPengeluaranArmada = pengeluaranArmadaList.reduce((acc, curr) => acc + curr.nominal, 0)
+  const totalPengeluaranArmadaKhusus = pengeluaranArmadaList.reduce((acc, curr) => acc + curr.nominal, 0)
+  const totalPengeluaranArmada = totalKomisiDriver + totalPengeluaranArmadaKhusus
   const totalPengeluaranUmum = pengeluaranUmumList.reduce((acc, curr) => acc + curr.nominal, 0)
-  const totalPengeluaranKeseluruhan = totalPengeluaranArmada + totalPengeluaranUmum
 
-  // PENDAPATAN BERSIH / SISA KAS JURAGAN
+  // 5. TOTAL SEMUA PENGELUARAN (KAS KELUAR RIIL):
+  // Komisi driver (kas keluar) + Biaya servis armada + Operasional umum/maintenance
+  const totalPengeluaranKeseluruhan = totalKomisiDriver + totalPengeluaranArmadaKhusus + totalPengeluaranUmum
+
+  // 6. SISA UANG BERSIH (KAS JURAGAN):
+  // Sisa Uang Bersih = Total Pendapatan Kotor - Total Semua Pengeluaran
+  // (Hasilnya sama persis: Setoran Bersih Masuk Kantor - Total Pengeluaran Maintenance/Umum)
   const pendapatanBersih = totalPendapatan - totalPengeluaranKeseluruhan
 
   // STATUS MOBIL HARIAN
@@ -213,30 +231,61 @@ export function BukuKasView({
     subDetail?: string
     angkotId?: string | null
     platNomor?: string
+    isDriverCommission?: boolean
+    parentSetoranId?: string
   }
 
-  const mergedTransactions: TransactionItem[] = [
-    ...currentSetoran.map((s) => ({
+  const setoranTransactions: TransactionItem[] = []
+  currentSetoran.forEach((s) => {
+    const a = angkotMap.get(s.angkotId)
+    const isBus = a?.tipeKendaraan === 'BUS' || s.angkot?.tipeKendaraan === 'BUS'
+    let labelMasuk = s.catatan && s.catatan.trim() ? s.catatan.trim() : (isBus ? 'Uang Sewa / Carter Masuk' : 'Setoran Harian Armada')
+    if (labelMasuk.toLowerCase() === 'komisi driver' || labelMasuk.toLowerCase() === 'komisi supir') {
+      labelMasuk = isBus ? 'Uang Sewa / Carter Masuk' : 'Setoran Harian Armada'
+    }
+
+    setoranTransactions.push({
       id: s.id,
       tipe: 'MASUK' as const,
-      kategori: 'Setoran Armada',
+      kategori: isBus ? 'Sewa / Carter Bus' : 'Setoran Armada',
       nominal: s.nominal,
-      keterangan: s.catatan || 'Setoran harian armada',
+      keterangan: labelMasuk,
       tanggal: s.tanggal,
-      subDetail: s.angkot?.platNomor || 'Armada',
+      subDetail: `${s.angkot?.platNomor || 'Armada'}${s.angkot?.namaSopirTetap ? ` (${s.angkot.namaSopirTetap})` : ''}`,
       angkotId: s.angkotId,
       platNomor: s.angkot?.platNomor,
-    })),
+    })
+
+    // Komisi Driver / Potongan Operasional Armada dicatat sebagai KAS KELUAR riil
+    if (s.pengeluaran && s.pengeluaran > 0) {
+      setoranTransactions.push({
+        id: `${s.id}_komisi`,
+        tipe: 'KELUAR' as const,
+        kategori: 'Komisi Driver / Operasional',
+        nominal: s.pengeluaran,
+        keterangan: s.keteranganPengeluaran || (isBus ? 'Komisi Driver (All In) & Biaya Jalan' : 'Potongan Operasional Sopir'),
+        tanggal: s.tanggal,
+        subDetail: `${s.angkot?.platNomor || 'Armada'}${s.angkot?.namaSopirTetap ? ` (${s.angkot.namaSopirTetap})` : ''}`,
+        angkotId: s.angkotId,
+        platNomor: s.angkot?.platNomor,
+        isDriverCommission: true,
+        parentSetoranId: s.id,
+      })
+    }
+  })
+
+  const mergedTransactions: TransactionItem[] = [
+    ...setoranTransactions,
     ...currentPengeluaran.map((p) => {
       const a = p.angkotId ? angkotMap.get(p.angkotId) : null
       return {
         id: p.id,
         tipe: 'KELUAR' as const,
-        kategori: p.kategori || 'Operasional',
+        kategori: p.kategori || 'Operasional Umum',
         nominal: p.nominal,
         keterangan: p.keterangan,
         tanggal: p.tanggal,
-        subDetail: a ? `Armada ${a.platNomor}` : 'Operasional Umum',
+        subDetail: a ? `Armada ${a.platNomor}` : 'Operasional Umum / Maintenance',
         angkotId: p.angkotId,
         platNomor: a?.platNomor,
       }
@@ -260,28 +309,55 @@ export function BukuKasView({
         ? labelHariIni
         : `Bulan ${namaBulanTahun}`
 
-    let text = `*LAPORAN BUKU KAS SETORAN ARMADA*\n`
-    text += `Juragan: ${namaJuragan}\n`
-    text += `Periode: ${periodeLabel}\n\n`
-    text += `💰 *TOTAL PENDAPATAN: Rp ${totalPendapatan.toLocaleString('id-ID')}*\n`
-    text += `🔻 *TOTAL PENGELUARAN: Rp ${totalPengeluaranKeseluruhan.toLocaleString('id-ID')}*\n`
-    text += `✅ *SISA KAS BERSIH: Rp ${pendapatanBersih.toLocaleString('id-ID')}*\n\n`
+    let text = `*LAPORAN BUKU KAS SETORAN ARMADA*
+`
+    text += `Juragan: ${namaJuragan}
+`
+    text += `Periode: ${periodeLabel}
+
+`
+    text += `💰 *TOTAL ORDER / SEWA KOTOR: Rp ${totalPendapatan.toLocaleString('id-ID')}*
+`
+    text += `🔻 *TOTAL PENGELUARAN (KAS KELUAR): Rp ${totalPengeluaranKeseluruhan.toLocaleString('id-ID')}*
+`
+    if (totalKomisiDriver > 0) {
+      text += `  • Komisi Driver & Operasional Armada: Rp ${totalKomisiDriver.toLocaleString('id-ID')}
+`
+    }
+    if (totalPengeluaranArmadaKhusus > 0) {
+      text += `  • Biaya Servis Khusus Armada: Rp ${totalPengeluaranArmadaKhusus.toLocaleString('id-ID')}
+`
+    }
+    if (totalPengeluaranUmum > 0) {
+      text += `  • Maintenance & Operasional Umum: Rp ${totalPengeluaranUmum.toLocaleString('id-ID')}
+`
+    }
+    text += `💵 *SETORAN BERSIH MASUK KANTOR: Rp ${totalSetoranBersihKantor.toLocaleString('id-ID')}*
+`
+    text += `✨ *SISA KAS BERSIH (JURAGAN): Rp ${pendapatanBersih.toLocaleString('id-ID')}*
+
+`
 
     if (armadaBreakdown.length > 0) {
-      text += `*RINCIAN PER ARMADA:*\n`
+      text += `*RINCIAN PER ARMADA:*
+`
       armadaBreakdown.forEach((m, idx) => {
-        text += `${idx + 1}. ${m.platNomor} (${m.namaSopir}): Rp ${m.totalSetoran.toLocaleString('id-ID')}`
+        text += `${idx + 1}. ${m.platNomor} (${m.namaSopir}): Kotor Rp ${m.totalSetoran.toLocaleString('id-ID')}`
         if (m.totalPengeluaran > 0) {
           text += ` (Biaya: -Rp ${m.totalPengeluaran.toLocaleString('id-ID')})`
         }
-        text += `\n`
+        text += ` -> Bersih Rp ${m.bersih.toLocaleString('id-ID')}
+`
       })
     }
 
     if (pengeluaranUmumList.length > 0) {
-      text += `\n*PENGELUARAN OPERASIONAL UMUM:*\n`
+      text += `
+*PENGELUARAN OPERASIONAL UMUM & MAINTENANCE:*
+`
       pengeluaranUmumList.forEach((p, idx) => {
-        text += `${idx + 1}. ${p.keterangan}: -Rp ${p.nominal.toLocaleString('id-ID')}\n`
+        text += `${idx + 1}. ${p.keterangan}: -Rp ${p.nominal.toLocaleString('id-ID')}
+`
       })
     }
 
@@ -295,10 +371,16 @@ export function BukuKasView({
     window.open(waUrl, '_blank')
   }
 
-  const handleOpenDeleteConfirm = (id: string, tipe: 'MASUK' | 'KELUAR', judul: string, nominal: number) => {
+  const handleOpenDeleteConfirm = (
+    id: string,
+    tipe: 'MASUK' | 'KELUAR',
+    judul: string,
+    nominal: number,
+    isDriverCommission?: boolean
+  ) => {
     playClickSound()
     triggerHaptic(25)
-    setDeleteConfirmData({ id, tipe, judul, nominal })
+    setDeleteConfirmData({ id, tipe, judul, nominal, isDriverCommission })
   }
 
   const handleExecuteDelete = () => {
@@ -307,7 +389,13 @@ export function BukuKasView({
     triggerHaptic(50)
 
     startTransition(() => {
-      if (deleteConfirmData.tipe === 'MASUK') {
+      if (deleteConfirmData.isDriverCommission || deleteConfirmData.id.endsWith('_komisi')) {
+        const parentId = deleteConfirmData.id.replace('_komisi', '')
+        updateOfflineSetoran(parentId, {
+          pengeluaran: 0,
+          keteranganPengeluaran: null,
+        })
+      } else if (deleteConfirmData.tipe === 'MASUK') {
         deleteOfflineSetoran(deleteConfirmData.id)
       } else {
         deleteOfflinePengeluaran(deleteConfirmData.id)
@@ -324,9 +412,12 @@ export function BukuKasView({
     setEditModalData({
       id: item.id,
       tipe: item.tipe,
-      judul: item.subDetail || (item.tipe === 'MASUK' ? 'Setoran Armada' : 'Pengeluaran Umum'),
+      judul: item.isDriverCommission
+        ? `Komisi Driver (${item.subDetail})`
+        : (item.subDetail || (item.tipe === 'MASUK' ? 'Setoran Armada' : 'Pengeluaran Umum')),
       nominal: item.nominal,
       keterangan: item.keterangan || '',
+      isDriverCommission: item.isDriverCommission,
     })
     setEditNominalInput(String(item.nominal))
     setEditKeteranganInput(item.keterangan || '')
@@ -350,7 +441,13 @@ export function BukuKasView({
     startTransition(() => {
       const targetDate = editTanggalInput ? new Date(editTanggalInput + 'T12:00:00').toISOString() : undefined
 
-      if (editModalData.tipe === 'MASUK') {
+      if (editModalData.isDriverCommission || editModalData.id.endsWith('_komisi')) {
+        const parentId = editModalData.id.replace('_komisi', '')
+        updateOfflineSetoran(parentId, {
+          pengeluaran: parsedNominal,
+          keteranganPengeluaran: editKeteranganInput.trim() || undefined,
+        })
+      } else if (editModalData.tipe === 'MASUK') {
         updateOfflineSetoran(editModalData.id, {
           nominal: parsedNominal,
           catatan: editKeteranganInput.trim(),
@@ -462,7 +559,7 @@ export function BukuKasView({
       />
 
       {/* KARTU RINGKASAN BUKU KAS */}
-      <div className="bg-white border border-slate-200/70 rounded-2xl p-4 sm:p-5 shadow-[0_1px_3px_rgba(0,0,0,0.03)] space-y-3.5">
+      <div className="bg-white border border-slate-200 rounded-3xl p-4 sm:p-5 shadow-xs space-y-4 overflow-hidden">
         <div className="flex items-center justify-between border-b border-slate-100 pb-3">
           <div className="flex items-center gap-3">
             <div className="w-12 h-12 rounded-2xl bg-blue-50 border border-blue-200 text-blue-700 flex items-center justify-center">
@@ -477,18 +574,18 @@ export function BukuKasView({
               </span>
             </div>
           </div>
-          <span className="text-xs font-bold px-3 py-1 rounded-full border transition-colors ${
-    periodeMode === 'harian'
-      ? 'bg-blue-50 text-blue-700 border-blue-200/80'
-      : 'bg-indigo-50 text-indigo-700 border-indigo-200/80'
-  }">
+          <span className={`text-xs font-bold px-3 py-1 rounded-full border transition-colors ${
+    periodeMode === "harian"
+      ? "bg-blue-50 text-blue-700 border-blue-200/80"
+      : "bg-indigo-50 text-indigo-700 border-indigo-200/80"
+  }`}>
             {periodeMode === 'harian' ? 'Rekap Harian' : 'Rekap Bulanan'}
           </span>
         </div>
 
         {/* UTAMA: PENDAPATAN BERSIH / SISA KAS JURAGAN */}
-        <div className="bg-emerald-50/50 border border-emerald-200 rounded-xl p-3.5 text-center">
-          <span className="text-xs font-bold text-emerald-800 tracking-wide block mb-0.5">
+        <div className="bg-emerald-50 border-2 border-emerald-300 rounded-2xl p-4 text-center shadow-xs">
+          <span className="text-xs font-black text-emerald-900 tracking-wider block mb-0.5 uppercase">
             SISA UANG BERSIH (KAS JURAGAN)
           </span>
           <div className="text-3xl sm:text-4xl font-black text-emerald-700 tracking-tight font-mono">
@@ -499,18 +596,18 @@ export function BukuKasView({
               (Rp {pendapatanBersih.toLocaleString('id-ID')})
             </span>
           )}
-          <span className="text-[11px] text-emerald-800 font-semibold block mt-1">
-            (Total Setoran Masuk dikurangi Total Semua Pengeluaran)
+          <span className="text-[11px] text-emerald-800 font-bold block mt-1.5">
+            (Total Setoran Masuk dikurangi Komisi Driver & Semua Biaya)
           </span>
         </div>
 
         {/* ARUS KAS MASUK VS KELUAR */}
         <div className="grid grid-cols-2 gap-3">
-          {/* Uang Masuk */}
+          {/* Uang Masuk Kotor */}
           <div className="bg-slate-50 border border-slate-200 rounded-2xl p-3.5">
-            <div className="flex items-center gap-1.5 text-xs font-black text-slate-500 uppercase">
+            <div className="flex items-center gap-1.5 text-xs font-black text-slate-600 uppercase">
               <TrendingUp className="w-4 h-4 text-emerald-600" />
-              <span>TOTAL SETORAN</span>
+              <span>TOTAL ORDER / SEWA</span>
             </div>
             <div className="text-xl font-black text-slate-900 mt-1 font-mono truncate" title={`Rp ${totalPendapatan.toLocaleString('id-ID')}`}>
               {formatRupiahAuto(totalPendapatan)}
@@ -526,7 +623,7 @@ export function BukuKasView({
             )}
           </div>
 
-          {/* Uang Keluar */}
+          {/* Uang Keluar (Komisi Driver + Maintenance) */}
           <div className="bg-slate-50 border border-slate-200 rounded-2xl p-3.5">
             <div className="flex items-center gap-1.5 text-xs font-black text-red-600 uppercase">
               <TrendingDown className="w-4 h-4 text-red-600" />
@@ -541,28 +638,55 @@ export function BukuKasView({
               </span>
             ) : (
               <span className="text-[11px] text-slate-500 font-bold block mt-0.5">
-                {pengeluaranArmadaList.length + pengeluaranUmumList.length} Catatan Biaya
+                {(totalKomisiDriver > 0 ? 1 : 0) + pengeluaranArmadaList.length + pengeluaranUmumList.length} Catatan Biaya
               </span>
             )}
           </div>
         </div>
 
-        {/* Breakdown Pengeluaran: Armada vs Umum */}
+        {/* Breakdown Pengeluaran: Komisi Driver vs Servis vs Operasional Umum */}
         {totalPengeluaranKeseluruhan > 0 && (
-          <div className="bg-slate-50 border border-slate-200 rounded-2xl p-3 space-y-1.5 text-xs font-bold text-slate-600">
-            <span className="text-[11px] font-black uppercase text-slate-500 block">
-              Rincian Biaya Pengeluaran:
+          <div className="bg-slate-50 border border-slate-200 rounded-2xl p-3.5 space-y-2 text-xs font-bold text-slate-600">
+            <span className="text-[11px] font-black uppercase text-slate-500 block border-b border-slate-200 pb-1.5">
+              Rincian Kas Keluar / Pengeluaran:
             </span>
-            <div className="flex justify-between items-center">
-              <span>• Biaya Operasional Armada:</span>
-              <span className="text-red-700 font-black">
-                {formatRupiahAuto(totalPengeluaranArmada)}
-              </span>
-            </div>
-            <div className="flex justify-between items-center">
-              <span>• Biaya Operasional Umum:</span>
-              <span className="text-red-700 font-black">
-                {formatRupiahAuto(totalPengeluaranUmum)}
+            {totalKomisiDriver > 0 && (
+              <div className="flex justify-between items-center text-slate-700">
+                <span className="flex items-center gap-1.5">
+                  <User className="w-3.5 h-3.5 text-slate-500" />
+                  <span>Komisi Driver & Operasional Armada:</span>
+                </span>
+                <span className="text-red-600 font-mono font-black">
+                  - {formatRupiahAuto(totalKomisiDriver)}
+                </span>
+              </div>
+            )}
+            {totalPengeluaranArmadaKhusus > 0 && (
+              <div className="flex justify-between items-center text-slate-700">
+                <span className="flex items-center gap-1.5">
+                  <Car className="w-3.5 h-3.5 text-slate-500" />
+                  <span>Servis Khusus Armada:</span>
+                </span>
+                <span className="text-red-600 font-mono font-black">
+                  - {formatRupiahAuto(totalPengeluaranArmadaKhusus)}
+                </span>
+              </div>
+            )}
+            {totalPengeluaranUmum > 0 && (
+              <div className="flex justify-between items-center text-slate-700">
+                <span className="flex items-center gap-1.5">
+                  <Wrench className="w-3.5 h-3.5 text-slate-500" />
+                  <span>Maintenance & Operasional Umum:</span>
+                </span>
+                <span className="text-red-600 font-mono font-black">
+                  - {formatRupiahAuto(totalPengeluaranUmum)}
+                </span>
+              </div>
+            )}
+            <div className="pt-2 border-t border-slate-200 flex justify-between items-center text-slate-900 font-black">
+              <span>Setoran Bersih Masuk Kas Kantor:</span>
+              <span className="text-emerald-700 font-mono">
+                {formatRupiahAuto(totalSetoranBersihKantor)}
               </span>
             </div>
           </div>
@@ -592,7 +716,7 @@ export function BukuKasView({
       </div>
 
       {/* PERFORMA KEUANGAN TIAP ARMADA */}
-      <div className="bg-white border border-slate-200 rounded-3xl p-5 shadow-sm space-y-3">
+      <div className="bg-white border border-slate-200 rounded-3xl p-5 shadow-xs space-y-3 overflow-hidden">
         <div className="flex items-center justify-between border-b border-slate-100 pb-2">
           <div className="flex items-center gap-2">
             <Car className="w-5 h-5 text-blue-600" />
@@ -640,12 +764,17 @@ export function BukuKasView({
                     {formatRupiahAuto(item.totalSetoran)}
                   </span>
                   {item.totalPengeluaran > 0 ? (
-                    <span className="text-[11px] font-bold text-red-600 block">
+                    <div className="text-[11px] font-bold text-red-600 block">
                       Biaya: -{formatRupiahAuto(item.totalPengeluaran)}
-                    </span>
+                    </div>
                   ) : (
                     <span className="text-[11px] font-semibold text-emerald-700 block">
                       Tanpa Potongan
+                    </span>
+                  )}
+                  {item.totalPengeluaran > 0 && (
+                    <span className="text-[11px] font-black text-emerald-700 block">
+                      Bersih: {formatRupiahAuto(item.bersih)}
                     </span>
                   )}
                 </div>
@@ -656,7 +785,7 @@ export function BukuKasView({
       </div>
 
       {/* RIWAYAT ARUS KAS LENGKAP */}
-      <div className="bg-white border border-slate-200 rounded-3xl p-5 shadow-sm space-y-3">
+      <div className="bg-white border border-slate-200 rounded-3xl p-5 shadow-xs space-y-3 overflow-hidden">
         {/* FILTER TAB TABEL TRANSAKSI */}
         <div className="flex items-center justify-between pt-1">
           <h3 className="text-base font-black text-slate-900">
@@ -730,7 +859,7 @@ export function BukuKasView({
                           : 'bg-red-100 text-red-800'
                       }`}
                     >
-                      {item.tipe === 'MASUK' ? '↓' : '↑'}
+                      {item.tipe === "MASUK" ? <TrendingUp className="w-4 h-4 text-emerald-700" /> : <TrendingDown className="w-4 h-4 text-red-600" />}
                     </div>
                     <div>
                       <span className="text-xs font-black text-slate-900 block leading-tight">
@@ -751,7 +880,7 @@ export function BukuKasView({
                         item.tipe === 'MASUK' ? 'text-emerald-700' : 'text-rose-600'
                       }`}
                     >
-                      {item.tipe === 'MASUK' ? '+' : '-'}{formatRupiahAuto(item.nominal)}
+                      {item.tipe === "MASUK" ? <TrendingUp className="w-4 h-4 text-emerald-700" /> : <TrendingDown className="w-4 h-4 text-red-600" />}{formatRupiahAuto(item.nominal)}
                     </span>
 
                     <div className="flex items-center gap-1.5">
@@ -773,8 +902,9 @@ export function BukuKasView({
                           handleOpenDeleteConfirm(
                             item.id,
                             item.tipe,
-                            item.tipe === 'MASUK' ? (item.subDetail || 'Armada') : item.keterangan,
-                            item.nominal
+                            item.isDriverCommission ? `Komisi Driver (${item.subDetail})` : (item.tipe === 'MASUK' ? (item.subDetail || 'Armada') : item.keterangan),
+                            item.nominal,
+                            item.isDriverCommission
                           )
                         }}
                         className="h-7 px-2.5 bg-rose-50 hover:bg-rose-100 active:bg-rose-200 text-rose-600 text-xs font-bold rounded-lg border border-rose-200/80 flex items-center gap-1 transition-all cursor-pointer shadow-2xs"
@@ -814,7 +944,7 @@ export function BukuKasView({
                 </div>
                 <div>
                   <h3 className="text-sm font-bold text-slate-900">
-                    Edit Catatan Kas
+                    {editModalData.isDriverCommission ? "Edit Komisi Driver" : "Edit Catatan Kas"}
                   </h3>
                   <span className="text-[10px] text-slate-400">
                     {editModalData.tipe === 'MASUK' ? 'Setoran Armada' : 'Pengeluaran Kas'} • {editModalData.judul}
@@ -850,22 +980,24 @@ export function BukuKasView({
                 )}
               </div>
 
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1 flex items-center gap-1.5">
-                  <Calendar className="w-3.5 h-3.5 text-blue-600" />
-                  Tanggal Transaksi:
-                </label>
-                <input
-                  type="date"
-                  value={editTanggalInput}
-                  onChange={(e) => setEditTanggalInput(e.target.value)}
-                  className="w-full h-10 px-3 text-xs font-semibold text-slate-800 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:border-blue-500 focus:outline-none"
-                  required
-                />
-                <span className="text-[10px] text-slate-400 mt-0.5 block">
-                  Ubah tanggal jika setoran ini kelupaan diinput di hari sebelumnya.
-                </span>
-              </div>
+              {!editModalData.isDriverCommission && (
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1 flex items-center gap-1.5">
+                    <Calendar className="w-3.5 h-3.5 text-blue-600" />
+                    Tanggal Transaksi:
+                  </label>
+                  <input
+                    type="date"
+                    value={editTanggalInput}
+                    onChange={(e) => setEditTanggalInput(e.target.value)}
+                    className="w-full h-10 px-3 text-xs font-semibold text-slate-800 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:border-blue-500 focus:outline-none"
+                    required
+                  />
+                  <span className="text-[10px] text-slate-400 mt-0.5 block">
+                    Ubah tanggal jika setoran ini kelupaan diinput di hari sebelumnya.
+                  </span>
+                </div>
+              )}
 
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1">
@@ -919,10 +1051,10 @@ export function BukuKasView({
 
             <div className="space-y-1">
               <h3 className="text-base font-bold text-slate-900">
-                Hapus Catatan Kas?
+                {deleteConfirmData.isDriverCommission ? "Hapus Komisi Driver?" : "Hapus Catatan Kas?"}
               </h3>
               <p className="text-xs text-slate-500 leading-relaxed">
-                Yakin ingin menghapus catatan {deleteConfirmData.tipe === 'MASUK' ? 'setoran' : 'pengeluaran'}{' '}
+                Yakin ingin menghapus catatan {deleteConfirmData.isDriverCommission ? 'komisi driver' : (deleteConfirmData.tipe === 'MASUK' ? 'setoran' : 'pengeluaran')}{' '}
                 <strong className="text-slate-800 font-semibold">{deleteConfirmData.judul}</strong> senilai{' '}
                 <strong className="text-slate-900 font-bold">{formatRupiahAuto(deleteConfirmData.nominal)}</strong>?
               </p>

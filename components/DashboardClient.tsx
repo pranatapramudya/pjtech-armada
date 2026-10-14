@@ -191,7 +191,7 @@ export function DashboardClient({
     <div className="min-h-screen bg-slate-100/70 flex justify-center selection:bg-amber-400 selection:text-slate-950">
       <main className="w-full max-w-md bg-slate-50/70 min-h-screen flex flex-col pb-28 relative border-x border-slate-200/70">
         {/* HEADER APLIKASI (CLEAN MODE) */}
-        <header className="bg-white/95 backdrop-blur-md text-slate-800 px-4 pt-3.5 pb-2.5 sticky top-0 z-20 border-b border-slate-200/70 shadow-[0_1px_3px_rgba(0,0,0,0.03)]">
+        <header className="bg-white text-slate-800 px-4 pt-3.5 pb-2.5 sticky top-0 z-20 border-b border-slate-200 shadow-xs" style={{ transform: "translate3d(0, 0, 0)", WebkitBackfaceVisibility: "hidden", backfaceVisibility: "hidden" }}>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2.5">
               <div className="w-10 h-10 rounded-xl bg-amber-500/15 text-amber-700 border border-amber-500/25 flex items-center justify-center font-bold shrink-0">
