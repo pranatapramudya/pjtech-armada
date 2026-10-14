@@ -311,6 +311,17 @@ export function AuthScreen({ onAuthSuccess }: AuthScreenProps) {
       return
     }
 
+    // Update di Cloud Database
+    fetch('/api/auth', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'reset_pin',
+        noHp: primaryAccount.noHp,
+        newPin: forgotNewPin.trim(),
+      }),
+    }).catch(() => {})
+
     const res = resetPinUser(primaryAccount.noHp, forgotNewPin)
     if (res.success && res.account) {
       playSuccessSound()
@@ -488,6 +499,25 @@ export function AuthScreen({ onAuthSuccess }: AuthScreenProps) {
                   <HelpCircle className="w-3.5 h-3.5" />
                   <span>Lupa PIN Akun Anda?</span>
                 </button>
+
+                <div className="pt-2 border-t border-slate-100 mt-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      playClickSound()
+                      triggerHaptic(30)
+                      if (typeof window !== 'undefined') {
+                        localStorage.removeItem('pjtech_all_accounts')
+                        localStorage.removeItem('pjtech_active_session')
+                        window.location.reload()
+                      }
+                    }}
+                    className="text-xs font-semibold text-slate-500 hover:text-slate-900 hover:underline inline-flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <RotateCcw className="w-3.5 h-3.5" />
+                    <span>Masuk dengan Nomor WhatsApp Lain</span>
+                  </button>
+                </div>
 
 
               </div>
