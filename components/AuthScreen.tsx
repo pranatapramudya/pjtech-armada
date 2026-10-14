@@ -364,7 +364,7 @@ export function AuthScreen({ onAuthSuccess }: AuthScreenProps) {
               </button>
 
               {/* TOMBOL BANTUAN LUPA PIN & RESET AKUN */}
-              <div className="flex flex-col items-center gap-2.5 pt-2">
+              <div className="text-center pt-2">
                 <button
                   type="button"
                   onClick={() => {
@@ -383,21 +383,7 @@ export function AuthScreen({ onAuthSuccess }: AuthScreenProps) {
                   <span>Lupa PIN Akun Anda?</span>
                 </button>
 
-                <button
-                  type="button"
-                  onClick={() => {
-                    playClickSound()
-                    triggerHaptic(40)
-                    if (window.confirm('Hapus akun ini dan reset perangkat untuk coba pendaftaran baru dari nol?')) {
-                      localStorage.clear()
-                      window.location.reload()
-                    }
-                  }}
-                  className="text-[11px] font-semibold text-rose-600 hover:text-rose-700 hover:underline inline-flex items-center gap-1 cursor-pointer"
-                >
-                  <RotateCcw className="w-3 h-3" />
-                  <span>Hapus Akun & Daftar Ulang (Reset Data)</span>
-                </button>
+
               </div>
             </div>
           )}
