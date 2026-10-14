@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import {
   Bus,
   User,
@@ -44,9 +44,35 @@ interface AuthScreenProps {
 }
 
 export function AuthScreen({ onAuthSuccess }: AuthScreenProps) {
-  const allRegistered = Object.values(getAllAccounts())
-  const primaryAccount: UserAccount | null = allRegistered[0] || null
-  const hasRegistered = !!primaryAccount
+  const [primaryAccount, setPrimaryAccount] = useState<UserAccount | null>(null)
+  const [hasRegistered, setHasRegistered] = useState(false)
+  const [isClientReady, setIsClientReady] = useState(false)
+
+  useEffect(() => {
+    setIsClientReady(true)
+    const accounts = Object.values(getAllAccounts())
+    if (accounts.length > 0) {
+      setPrimaryAccount(accounts[0])
+      setHasRegistered(true)
+    } else {
+      setPrimaryAccount(null)
+      setHasRegistered(false)
+    }
+  }, [])
+
+  const handleSwitchAccount = () => {
+    playClickSound()
+    triggerHaptic(30)
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('pjtech_armada_all_tenants_v1')
+      localStorage.removeItem('pjtech_armada_active_tenant_id')
+    }
+    setPrimaryAccount(null)
+    setHasRegistered(false)
+    setActiveTab('login')
+    setLoginPin('')
+    setErrorMsg(null)
+  }
 
   // Mode: jika sudah ada akun terdaftar di HP ini, kunci hanya ke mode login (1 user 1 device)
   const [activeTab, setActiveTab] = useState<'register' | 'login'>('login')
@@ -80,11 +106,16 @@ export function AuthScreen({ onAuthSuccess }: AuthScreenProps) {
 
   // Numpad click for login PIN
   const handleNumpadPress = (num: string) => {
+    if (isSubmitting) return
     playClickSound()
     triggerHaptic(25)
     setErrorMsg(null)
     if (loginPin.length < 6) {
-      setLoginPin((prev) => prev + num)
+      const nextPin = loginPin + num
+      setLoginPin(nextPin)
+      if (nextPin.length === 6) {
+        handleExecuteLogin(undefined, nextPin)
+      }
     }
   }
 
@@ -255,30 +286,73 @@ export function AuthScreen({ onAuthSuccess }: AuthScreenProps) {
     }
   }
 
-  // Submit login PIN
-  const handleExecuteLogin = (e?: React.FormEvent) => {
+  // Submit login PIN (mendukung verifikasi offline dan cloud sync otomatis)
+  const handleExecuteLogin = async (e?: React.FormEvent, customPin?: string) => {
     if (e) e.preventDefault()
     setErrorMsg(null)
+
+    const pinToVerify = (customPin !== undefined ? customPin : loginPin).trim()
 
     if (!primaryAccount) {
       setErrorMsg('Belum ada akun terdaftar di perangkat ini.')
       return
     }
 
-    if (loginPin.length < 4) {
+    if (pinToVerify.length < 4) {
       setErrorMsg('Masukkan minimal 4 digit PIN Anda!')
       triggerHaptic(50)
       return
     }
 
-    const res = loginUser(primaryAccount.noHp, loginPin)
+    // 1. Cek offline dulu
+    const res = loginUser(primaryAccount.noHp, pinToVerify)
     if (res.success && res.account) {
       playSuccessSound()
       triggerHaptic(40)
       onAuthSuccess(res.account)
-    } else {
-      setErrorMsg(res.pesan)
+      return
+    }
+
+    // 2. Jika offline gagal, verifikasi ke Cloud Neon DB
+    setIsSubmitting(true)
+    try {
+      const resp = await fetch('/api/auth', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'login',
+          noHp: primaryAccount.noHp,
+          pin: pinToVerify,
+        }),
+      })
+      const cloudRes = await resp.json()
+      if (cloudRes.success && cloudRes.user) {
+        const u = cloudRes.user
+        const localAcc = registerUser(
+          u.namaJuragan,
+          u.noHp,
+          u.pin,
+          (u.paket as PaketLangganan) || 'TRIAL',
+          u.email || ''
+        )
+        syncCloudDataToOffline({
+          namaJuragan: u.namaJuragan,
+          noHp: u.noHp,
+          angkotList: u.angkotList,
+          setoranList: u.setoranList,
+        })
+        playSuccessSound()
+        triggerHaptic(40)
+        onAuthSuccess(localAcc)
+        return
+      }
+      setErrorMsg(cloudRes.message || res.pesan || 'PIN akun salah!')
       triggerHaptic(70)
+    } catch {
+      setErrorMsg(res.pesan || 'PIN akun salah!')
+      triggerHaptic(70)
+    } finally {
+      setIsSubmitting(false)
     }
   }
 
@@ -348,6 +422,14 @@ export function AuthScreen({ onAuthSuccess }: AuthScreenProps) {
     window.open(`https://wa.me/6281234567890?text=${msg}`, '_blank')
   }
 
+  if (!isClientReady) {
+    return (
+      <div className="min-h-screen bg-slate-100 flex items-center justify-center p-4">
+        <div className="w-8 h-8 rounded-full border-2 border-slate-900 border-t-transparent animate-spin" />
+      </div>
+    )
+  }
+
   return (
     <div className="min-h-screen bg-slate-100 flex justify-center selection:bg-amber-400">
       <main className="w-full max-w-md bg-white min-h-screen flex flex-col justify-between p-6 shadow-xs border-x border-slate-200/70">
@@ -374,7 +456,7 @@ export function AuthScreen({ onAuthSuccess }: AuthScreenProps) {
           </div>
 
           {/* JIKA SUDAH ADA AKUN: KUNCI KE 1 USER (LOGIN PIN), TIDAK BISA DAFTAR ULANG SEMBARANGAN */}
-          {hasRegistered && (
+          {hasRegistered && primaryAccount && (
             <div className="mt-5 space-y-4 animate-in fade-in duration-150">
               {/* KARTU AKUN TERDAFTAR */}
               <div className="bg-slate-50/80 border border-slate-200/80 rounded-2xl p-4 flex items-center justify-between shadow-xs">
@@ -500,21 +582,13 @@ export function AuthScreen({ onAuthSuccess }: AuthScreenProps) {
                   <span>Lupa PIN Akun Anda?</span>
                 </button>
 
-                <div className="pt-2 border-t border-slate-100 mt-2">
+                <div className="pt-3 border-t border-slate-100 mt-3">
                   <button
                     type="button"
-                    onClick={() => {
-                      playClickSound()
-                      triggerHaptic(30)
-                      if (typeof window !== 'undefined') {
-                        localStorage.removeItem('pjtech_all_accounts')
-                        localStorage.removeItem('pjtech_active_session')
-                        window.location.reload()
-                      }
-                    }}
-                    className="text-xs font-semibold text-slate-500 hover:text-slate-900 hover:underline inline-flex items-center gap-1.5 cursor-pointer"
+                    onClick={handleSwitchAccount}
+                    className="w-full py-2.5 px-3 bg-slate-100 hover:bg-slate-200 active:scale-95 text-slate-700 text-xs font-bold rounded-xl border border-slate-200/80 transition-all flex items-center justify-center gap-2 cursor-pointer shadow-xs"
                   >
-                    <RotateCcw className="w-3.5 h-3.5" />
+                    <RotateCcw className="w-3.5 h-3.5 text-slate-500" />
                     <span>Masuk dengan Nomor WhatsApp Lain</span>
                   </button>
                 </div>
