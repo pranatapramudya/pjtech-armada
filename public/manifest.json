@@ -1,0 +1,18 @@
+﻿{
+  "name": "PJTech Armada - Setoran Angkot & Bus",
+  "short_name": "PJTech Armada",
+  "description": "Sistem Operasional dan Pencatatan Setoran Angkot & Bus Pariwisata / Travel",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0F172A",
+  "theme_color": "#0F172A",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "192x192 512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
