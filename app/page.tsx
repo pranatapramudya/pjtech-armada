@@ -1,4 +1,4 @@
-﻿'use client'
+'use client'
 
 import { useState, useEffect } from 'react'
 import {
@@ -6,6 +6,7 @@ import {
   getOfflineAngkotList,
   getOfflineSetoranList,
   getOfflinePengeluaranList,
+  syncCloudDataToOffline,
   OfflineAngkot,
   OfflineSetoran,
   OfflinePengeluaran,
@@ -67,6 +68,35 @@ export default function Page() {
   useEffect(() => {
     loadData()
     setMounted(true)
+
+    // Sinkronisasi data otomatis dengan Neon Cloud Database (Multi-Device HP & PC)
+    const acc = getUserAccount()
+    if (acc && acc.isLoggedIn) {
+      fetch('/api/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          tenantId: acc.tenantId,
+          noHp: acc.noHp,
+          angkotList: getOfflineAngkotList(),
+          setoranList: getOfflineSetoranList(),
+        }),
+      })
+        .then((res) => res.json())
+        .then((data) => {
+          if (data && data.success) {
+            syncCloudDataToOffline({
+              namaJuragan: acc.namaJuragan,
+              noHp: acc.noHp,
+              angkotList: data.angkotList,
+              setoranList: data.setoranList,
+            })
+            setAngkotList(getOfflineAngkotList())
+            setSetoranList(getOfflineSetoranList())
+          }
+        })
+        .catch(() => {})
+    }
 
     // Deteksi Otomatis Redirect dari Mayar.id via Query Params
     if (typeof window !== 'undefined') {

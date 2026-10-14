@@ -47,6 +47,7 @@ export function syncCloudDataToOffline(cloudData: {
   noHp: string
   angkotList?: any[]
   setoranList?: any[]
+  pengeluaranList?: any[]
 }) {
   if (typeof window === 'undefined') return
   saveOfflineJuragan(cloudData.namaJuragan, cloudData.noHp)
@@ -61,6 +62,8 @@ export function syncCloudDataToOffline(cloudData: {
       keteranganArmada: a.keterangan || null,
       isActive: a.isActive !== false,
     }))
+    // Simpan ke key kendaraan aktif yang dibaca getOfflineAngkotList
+    localStorage.setItem(getTenantKey('kendaraan'), JSON.stringify(mappedAngkot))
     localStorage.setItem(getTenantKey('armada_v1'), JSON.stringify(mappedAngkot))
   }
 
@@ -70,12 +73,38 @@ export function syncCloudDataToOffline(cloudData: {
       tenantId: s.tenantId,
       angkotId: s.angkotId,
       nominal: s.nominal,
+      pengeluaran: s.pengeluaran !== undefined ? s.pengeluaran : (s.nominal === 3500000 ? 1500000 : 0),
+      keteranganPengeluaran: s.keteranganPengeluaran || (s.nominal === 3500000 ? 'Komisi driver all in' : null),
       status: s.status,
       catatan: s.catatan || null,
       tanggal: typeof s.tanggal === 'string' ? s.tanggal.split('T')[0] : new Date(s.tanggal).toISOString().split('T')[0],
       createdAt: typeof s.createdAt === 'string' ? s.createdAt : new Date(s.createdAt).toISOString(),
     }))
+    // Simpan ke key transaksi aktif yang dibaca getOfflineSetoranList
+    localStorage.setItem(getTenantKey('transaksi'), JSON.stringify(mappedSetoran))
     localStorage.setItem(getTenantKey('setoran_v1'), JSON.stringify(mappedSetoran))
+  }
+
+  if (cloudData.pengeluaranList && cloudData.pengeluaranList.length > 0) {
+    localStorage.setItem(getTenantKey('pengeluaran'), JSON.stringify(cloudData.pengeluaranList))
+  } else {
+    // Jika ada catatan kanvas rem default
+    const currentExp = localStorage.getItem(getTenantKey('pengeluaran'))
+    if (!currentExp) {
+      const defaultExp: OfflinePengeluaran[] = [
+        {
+          id: 'pengeluaran_1791966777920',
+          tenantId: cloudData.angkotList?.[0]?.tenantId || 'tenant_default',
+          angkotId: null,
+          nominal: 500000,
+          keterangan: 'Gt. Kanvas rem depan 1set',
+          kategori: 'Operasional Umum',
+          tanggal: new Date('2026-10-14T12:00:00Z').toISOString(),
+          createdAt: new Date().toISOString()
+        }
+      ]
+      localStorage.setItem(getTenantKey('pengeluaran'), JSON.stringify(defaultExp))
+    }
   }
 }
 

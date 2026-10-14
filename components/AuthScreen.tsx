@@ -49,7 +49,7 @@ export function AuthScreen({ onAuthSuccess }: AuthScreenProps) {
   const hasRegistered = !!primaryAccount
 
   // Mode: jika sudah ada akun terdaftar di HP ini, kunci hanya ke mode login (1 user 1 device)
-  const [activeTab, setActiveTab] = useState<'register' | 'login'>('register')
+  const [activeTab, setActiveTab] = useState<'register' | 'login'>('login')
   const [loginPhoneInput, setLoginPhoneInput] = useState('')
   const [loginPinInput, setLoginPinInput] = useState('')
   const [showLoginPin, setShowLoginPin] = useState(false)
@@ -120,8 +120,10 @@ export function AuthScreen({ onAuthSuccess }: AuthScreenProps) {
     const cleanPhone = noHp.trim().replace(/[^0-9]/g, '');
     const existingAccounts = getAllAccounts();
     if (existingAccounts['tenant_' + cleanPhone]) {
-      setErrorMsg('Nomor HP ini sudah terdaftar! Silakan login dengan PIN Anda.');
-      triggerHaptic(50);
+      setLoginPhoneInput(cleanPhone);
+      setActiveTab('login');
+      setErrorMsg('Nomor WhatsApp ini sudah terdaftar! Masukkan PIN (6 digit) untuk masuk di HP ini.');
+      triggerHaptic(40);
       return;
     }
     if (pin.length < 4) {
@@ -161,8 +163,10 @@ export function AuthScreen({ onAuthSuccess }: AuthScreenProps) {
       });
       const data = await res.json();
       if (!data.success && data.message && data.message.includes('sudah terdaftar')) {
-        setErrorMsg(data.message);
-        triggerHaptic(60);
+        setLoginPhoneInput(noHp);
+        setActiveTab('login');
+        setErrorMsg('Nomor WhatsApp ini sudah terdaftar! Masukkan 6 digit PIN akun Anda untuk login di HP ini.');
+        triggerHaptic(40);
         return;
       }
     } catch (e) {
@@ -354,7 +358,7 @@ export function AuthScreen({ onAuthSuccess }: AuthScreenProps) {
             </div>
 
             <span className="text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 border border-slate-200/80">
-              {hasRegistered ? '1 Akun Terdaftar' : 'Pendaftaran'}
+              {hasRegistered ? 'Akun Terdaftar' : 'Akses Multi-Device'}
             </span>
           </div>
 
@@ -502,6 +506,24 @@ export function AuthScreen({ onAuthSuccess }: AuthScreenProps) {
                   onClick={() => {
                     playClickSound()
                     triggerHaptic(20)
+                    setActiveTab('login')
+                    setErrorMsg(null)
+                  }}
+                  className={`py-2 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                    activeTab === 'login'
+                      ? 'bg-white text-blue-700 shadow-xs'
+                      : 'text-slate-500 hover:text-slate-900'
+                  }`}
+                >
+                  <LogIn className="w-3.5 h-3.5" />
+                  <span>Masuk (Sudah Ada Akun)</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    playClickSound()
+                    triggerHaptic(20)
                     setActiveTab('register')
                     setErrorMsg(null)
                   }}
@@ -514,32 +536,14 @@ export function AuthScreen({ onAuthSuccess }: AuthScreenProps) {
                   <UserPlus className="w-3.5 h-3.5" />
                   <span>Daftar Baru</span>
                 </button>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    playClickSound()
-                    triggerHaptic(20)
-                    setActiveTab('login')
-                    setErrorMsg(null)
-                  }}
-                  className={`py-2 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
-                    activeTab === 'login'
-                      ? 'bg-white text-blue-700 shadow-xs'
-                      : 'text-slate-500 hover:text-slate-900'
-                  }`}
-                >
-                  <LogIn className="w-3.5 h-3.5" />
-                  <span>Sudah Punya Akun</span>
-                </button>
               </div>
 
               {/* FORM LOGIN AKUN LINTAS DEVICE */}
               {activeTab === 'login' && (
                 <form onSubmit={handleExecuteLoginCrossDevice} className="space-y-4 animate-in fade-in duration-150">
                   <div className="bg-amber-50 border border-amber-200/80 rounded-xl p-3 text-xs text-amber-900">
-                    <span className="font-bold block">Masuk di Perangkat Baru</span>
-                    Masukkan Nomor WhatsApp dan PIN akun Anda untuk menarik data armada dari server cloud.
+                    <span className="font-bold block">Masuk ke Akun Juragan</span>
+                    Masukkan Nomor WhatsApp & PIN akun Anda untuk mengakses sistem di HP ini. Data armada otomatis tersinkronisasi.
                   </div>
 
                   <div>
@@ -602,8 +606,8 @@ export function AuthScreen({ onAuthSuccess }: AuthScreenProps) {
               {activeTab === 'register' && regStep === 'form' && (
             <form onSubmit={handleNextToPaket} className="mt-5 space-y-3.5 animate-in fade-in duration-150">
               <div className="bg-blue-50/70 border border-blue-200/70 rounded-xl p-3 text-xs text-blue-800">
-                <span className="font-bold block">Pendaftaran 1 Akun Perangkat</span>
-                Daftarkan profil armada Anda satu kali untuk dipakai seterusnya di HP ini.
+                <span className="font-bold block">Daftar Akun Baru PJTech Armada</span>
+                Akun dapat diakses fleksibel di HP maupun Laptop secara bersamaan.
               </div>
 
               <div>
