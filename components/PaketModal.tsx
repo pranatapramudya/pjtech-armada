@@ -189,46 +189,7 @@ export function PaketModal({ isOpen, onClose, account, onUpdateAccount }: PaketM
           </p>
         </div>
 
-                {/* Tombol Konfirmasi Bayar */}
-        <button
-          type="button"
-          onClick={() => {
-            playClickSound()
-            triggerHaptic(30)
-            setShowConfirmAktivasi(true)
-          }}
-          className="w-full min-h-[46px] bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white text-xs font-black rounded-2xl flex items-center justify-center gap-1.5 cursor-pointer shadow mb-2.5 transition-all"
-        >
-          <span>⚡ SAYA SUDAH BAYAR (AKTIFKAN SEKARANG)</span>
-        </button>
-
-        {showConfirmAktivasi && (
-          <div className="bg-emerald-50 border-2 border-emerald-500 rounded-2xl p-3.5 mb-3 text-slate-900 animate-in zoom-in-95">
-            <p className="text-xs font-black text-center mb-2.5 text-emerald-950">
-              Pilih paket yang sudah Anda bayar di Mayar:
-            </p>
-            <div className="space-y-2">
-              <button
-                type="button"
-                onClick={() => handleProsesAktivasiLangsung('SEMESTER')}
-                className="w-full py-2 px-3 bg-white hover:bg-emerald-100 border border-emerald-300 rounded-xl text-xs font-black text-emerald-900 flex justify-between cursor-pointer"
-              >
-                <span>Paket 6 Bulan (+185 Hari)</span>
-                <span>Rp 250.000</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => handleProsesAktivasiLangsung('TAHUNAN')}
-                className="w-full py-2 px-3 bg-amber-400 hover:bg-amber-300 rounded-xl text-xs font-black text-slate-950 flex justify-between cursor-pointer"
-              >
-                <span>Paket 1 Tahun (+366 Hari)</span>
-                <span>Rp 450.000</span>
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* Bantuan WhatsApp */}
+                {/* Bantuan WhatsApp */}
         <button
           type="button"
           onClick={handleBukaWhatsApp}
