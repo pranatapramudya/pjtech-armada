@@ -7,22 +7,28 @@ generator client {
   provider = "prisma-client-js"
 }
 
-// Tenancy: Juragan Angkot atau Koperasi Angkot
+// Tenancy: Juragan Angkot atau Koperasi Angkot / PO Bus
 model Tenant {
   id          String    @id @default(cuid())
   namaJuragan String
   noHp        String    @unique
+  email       String?
+  pin         String    @default("123456")
+  paket       String    @default("TRIAL") // TRIAL, SEMESTER, TAHUNAN
+  aktifSampai DateTime?
   createdAt   DateTime  @default(now())
   angkotList  Angkot[]
   setoranList Setoran[]
 }
 
-// Data Armada Mobil Angkot
+// Data Armada Mobil Angkot & Bus
 model Angkot {
   id             String    @id @default(cuid())
   tenantId       String
   platNomor      String    // Contoh: D 1902 AB
   namaSopirTetap String?   // Contoh: Mang Ujang
+  tipeKendaraan  String    @default("ANGKOT") // ANGKOT | BUS
+  keterangan     String?
   targetHarian   Int       @default(150000) // Nilai target setoran harian (Rp)
   isActive       Boolean   @default(true)
   createdAt      DateTime  @default(now())

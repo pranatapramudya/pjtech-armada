@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "next build",    "build:mobile": "cross-env NEXT_EXPORT=true next build",
     "start": "next start",
     "lint": "eslint"
   },

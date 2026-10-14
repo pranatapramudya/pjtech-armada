@@ -1,4 +1,4 @@
-﻿import { getActiveTenantId } from './licenseStorage';
+import { getActiveTenantId } from './licenseStorage';
 
 export type TipeKendaraan = 'ANGKOT' | 'BUS';
 
@@ -40,6 +40,43 @@ export interface OfflinePengeluaran {
 function getTenantKey(baseKey: string): string {
   const currentTenant = getActiveTenantId() || 'tenant_default';
   return `pjtech_${currentTenant}_${baseKey}`;
+}
+
+export function syncCloudDataToOffline(cloudData: {
+  namaJuragan: string
+  noHp: string
+  angkotList?: any[]
+  setoranList?: any[]
+}) {
+  if (typeof window === 'undefined') return
+  saveOfflineJuragan(cloudData.namaJuragan, cloudData.noHp)
+
+  if (cloudData.angkotList && cloudData.angkotList.length > 0) {
+    const mappedAngkot: OfflineAngkot[] = cloudData.angkotList.map((a: any) => ({
+      id: a.id,
+      tenantId: a.tenantId,
+      platNomor: a.platNomor,
+      namaSopirTetap: a.namaSopirTetap || null,
+      tipeKendaraan: (a.tipeKendaraan as any) || 'ANGKOT',
+      keteranganArmada: a.keterangan || null,
+      isActive: a.isActive !== false,
+    }))
+    localStorage.setItem(getTenantKey('armada_v1'), JSON.stringify(mappedAngkot))
+  }
+
+  if (cloudData.setoranList && cloudData.setoranList.length > 0) {
+    const mappedSetoran: OfflineSetoran[] = cloudData.setoranList.map((s: any) => ({
+      id: s.id,
+      tenantId: s.tenantId,
+      angkotId: s.angkotId,
+      nominal: s.nominal,
+      status: s.status,
+      catatan: s.catatan || null,
+      tanggal: typeof s.tanggal === 'string' ? s.tanggal.split('T')[0] : new Date(s.tanggal).toISOString().split('T')[0],
+      createdAt: typeof s.createdAt === 'string' ? s.createdAt : new Date(s.createdAt).toISOString(),
+    }))
+    localStorage.setItem(getTenantKey('setoran_v1'), JSON.stringify(mappedSetoran))
+  }
 }
 
 export function getOfflineJuragan(): { namaJuragan: string; noHp: string } {
