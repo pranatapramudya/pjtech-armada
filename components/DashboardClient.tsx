@@ -1,4 +1,4 @@
-﻿'use client'
+'use client'
 
 import { useState, useRef, useEffect } from 'react'
 import { Plus, Bus, RefreshCw, Settings, TrendingDown, Calendar, ChevronLeft, ChevronRight, LogOut, Clock, AlertTriangle } from 'lucide-react'
@@ -13,6 +13,7 @@ import { CatatPengeluaranModal } from './CatatPengeluaranModal'
 import { BottomNav, TabType } from './BottomNav'
 import { PaketView } from './PaketView'
 import { PengaturanView } from './PengaturanView'
+import { PWAInstallBanner } from './PWAInstallBanner'
 import { OfflinePengeluaran, OfflineAngkot } from '@/lib/offlineStorage'
 import { UserAccount, checkLisensiStatus, logoutUser } from '@/lib/licenseStorage'
 import { playClickSound, triggerHaptic } from '@/lib/audio'
@@ -273,6 +274,8 @@ export function DashboardClient({
             </div>
           </div>
         </header>
+        {/* NOTIFIKASI / BANNER PASANG APLIKASI (PWA INSTALL PROMPT) */}
+        <PWAInstallBanner />
 
         {/* KONTEN UTAMA */}
         <div className="flex-1 p-4 space-y-4">

@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import { Settings, Check, AlertCircle, User, Phone, Mail, CheckCircle2, LogOut, ShieldCheck } from 'lucide-react'
+import { Settings, Check, AlertCircle, User, Phone, Mail, CheckCircle2, LogOut, ShieldCheck, Smartphone, Download, Apple, Share2, PlusSquare, X } from 'lucide-react'
 import { saveOfflineJuragan } from '@/lib/offlineStorage'
 import { getUserAccount, updateUserAccountProfile } from '@/lib/licenseStorage'
 import { playClickSound, playSuccessSound, triggerHaptic } from '@/lib/audio'
@@ -25,6 +25,7 @@ export function PengaturanView({
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [isSuccess, setIsSuccess] = useState(false)
   const [confirmLogout, setConfirmLogout] = useState(false)
+  const [showPanduanPWA, setShowPanduanPWA] = useState(false)
   const [isPending, startTransition] = useTransition()
 
   const handleSubmit = (e: React.FormEvent) => {
