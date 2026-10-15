@@ -35,7 +35,7 @@ import {
   PaketLangganan,
   MAYAR_PAYMENT_LINKS, getMayarPaymentUrl,
 } from '@/lib/licenseStorage'
-import { saveOfflineJuragan, syncCloudDataToOffline } from '@/lib/offlineStorage'
+import { saveOfflineJuragan, syncCloudDataToOffline, getOfflineAngkotList, getOfflineSetoranList } from '@/lib/offlineStorage'
 import { registerTenantCloudAction, loginTenantCloudAction } from '@/app/actions/auth'
 import { playClickSound, playSuccessSound, triggerHaptic } from '@/lib/audio'
 
@@ -271,6 +271,22 @@ export function AuthScreen({ onAuthSuccess }: AuthScreenProps) {
       } else {
         const localCheck = loginUser(loginPhoneInput, loginPinInput)
         if (localCheck.success && localCheck.account) {
+          // Sync akun PC lokal langsung ke Neon Cloud Database
+          fetch('/api/sync', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              tenantId: localCheck.account.tenantId,
+              namaJuragan: localCheck.account.namaJuragan,
+              noHp: localCheck.account.noHp,
+              pin: localCheck.account.pin,
+              email: localCheck.account.email,
+              paket: localCheck.account.paket,
+              angkotList: getOfflineAngkotList(),
+              setoranList: getOfflineSetoranList(),
+            }),
+          }).catch(() => {})
+
           playSuccessSound()
           onAuthSuccess(localCheck.account)
         } else {

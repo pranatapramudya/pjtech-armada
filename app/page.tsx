@@ -77,7 +77,11 @@ export default function Page() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           tenantId: acc.tenantId,
+          namaJuragan: acc.namaJuragan,
           noHp: acc.noHp,
+          pin: acc.pin,
+          email: acc.email,
+          paket: acc.paket,
           angkotList: getOfflineAngkotList(),
           setoranList: getOfflineSetoranList(),
         }),
