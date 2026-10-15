@@ -323,6 +323,22 @@ export function AuthScreen({ onAuthSuccess }: AuthScreenProps) {
     // 1. Cek offline dulu
     const res = loginUser(primaryAccount.noHp, pinToVerify)
     if (res.success && res.account) {
+      // Background sync akun ke Neon Cloud Database
+      fetch('/api/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          tenantId: res.account.tenantId,
+          namaJuragan: res.account.namaJuragan,
+          noHp: res.account.noHp,
+          pin: pinToVerify,
+          email: res.account.email,
+          paket: res.account.paket,
+          angkotList: getOfflineAngkotList(),
+          setoranList: getOfflineSetoranList(),
+        }),
+      }).catch(() => {})
+
       playSuccessSound()
       triggerHaptic(40)
       onAuthSuccess(res.account)
