@@ -210,7 +210,8 @@ export function DashboardClient({
             <div className="flex items-center gap-1.5" />
           </div>
 
-          {/* BANNER TANGGAL DENGAN KALENDER & BADGE JUMLAH (CLEAN MODE) */}
+          {/* BANNER TANGGAL DENGAN KALENDER & BADGE JUMLAH (HANYA TAB SETOR) */}
+          {activeTab === 'setor' && (
           <div className="mt-3.5 pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
             <div className="flex items-center bg-slate-100 rounded-xl border border-slate-200 p-0.5">
               <button
@@ -273,6 +274,7 @@ export function DashboardClient({
               </span>
             </div>
           </div>
+          )}
         </header>
         {/* NOTIFIKASI / BANNER PASANG APLIKASI (PWA INSTALL PROMPT) */}
         <PWAInstallBanner />

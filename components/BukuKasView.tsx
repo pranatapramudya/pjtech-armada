@@ -716,6 +716,7 @@ export function BukuKasView({
       </div>
 
       {/* PERFORMA KEUANGAN TIAP ARMADA */}
+      {totalMobil > 0 && (
       <div className="bg-white border border-slate-200 rounded-3xl p-5 shadow-xs space-y-3 overflow-hidden">
         <div className="flex items-center justify-between border-b border-slate-100 pb-2">
           <div className="flex items-center gap-2">
@@ -783,18 +784,19 @@ export function BukuKasView({
           </div>
         )}
       </div>
+      )}
 
       {/* RIWAYAT ARUS KAS LENGKAP */}
       <div className="bg-white border border-slate-200 rounded-3xl p-5 shadow-xs space-y-3 overflow-hidden">
         {/* FILTER TAB TABEL TRANSAKSI */}
-        <div className="flex items-center justify-between pt-1">
-          <h3 className="text-base font-black text-slate-900">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pt-1">
+          <h3 className="text-sm sm:text-base font-black text-slate-900 leading-tight">
             RINCIAN ARUS KAS {periodeMode === 'harian' ? 'HARI INI' : `BULAN ${namaBulanTahun.toUpperCase()}`}
           </h3>
           <button
             type="button"
             onClick={onCatatPengeluaranClick}
-            className="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white rounded-xl font-black text-xs flex items-center gap-1 shadow-sm active:scale-95 cursor-pointer"
+            className="self-start sm:self-auto px-3.5 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl font-black text-xs flex items-center gap-1.5 shadow-sm active:scale-95 cursor-pointer shrink-0"
           >
             <Plus className="w-3.5 h-3.5 stroke-[3]" />
             Catat Pengeluaran
@@ -874,13 +876,14 @@ export function BukuKasView({
                     </div>
                   </div>
 
-                  <div className="flex flex-col items-end gap-1.5 shrink-0 pl-2">
+                  <div className="flex flex-col items-end gap-2 shrink-0 pl-2">
                     <span
-                      className={`text-sm font-bold font-mono ${
+                      className={`text-sm font-black font-mono flex items-center gap-1 ${
                         item.tipe === 'MASUK' ? 'text-emerald-700' : 'text-rose-600'
                       }`}
                     >
-                      {item.tipe === "MASUK" ? <TrendingUp className="w-4 h-4 text-emerald-700" /> : <TrendingDown className="w-4 h-4 text-red-600" />}{formatRupiahAuto(item.nominal)}
+                      {item.tipe === "MASUK" ? <TrendingUp className="w-4 h-4 text-emerald-700 shrink-0" /> : <TrendingDown className="w-4 h-4 text-red-600 shrink-0" />}
+                      <span className="whitespace-nowrap">{formatRupiahAuto(item.nominal)}</span>
                     </span>
 
                     <div className="flex items-center gap-1.5">
